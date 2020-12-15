@@ -1,0 +1,69 @@
+version: "3"
+
+#defaults
+########################################################################
+
+networks:
+  frontend:
+
+x-default-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: 10m
+
+#variables
+########################################################################
+
+x-app-environment: &app-environment
+  GUNICORN_HTTP_WORKER_THREADS: "4"
+  GUNICORN_ARGUMENTS: "--reload"
+  FLASK_PORT: "8000"
+  FLASK_APP: "server:app"
+  FLASK_ENV: "development"
+
+x-nginx-environment: &nginx-environment
+  LOG_RETENTION: "false"
+
+#main
+########################################################################
+
+services:
+
+  app:
+    container_name: containerize_app_1
+    image: containerize_app:latest
+    build: ./app
+    volumes:
+      - "./app/src:/service/src"
+      - "./nginx/external/security/localhost.crt:/service/conf/app.crt"
+      - "./nginx/external/security/localhost.key:/service/conf/app.key"
+    user: app
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - frontend
+    logging: *default-logging
+    environment: *app-environment
+
+  nginx:
+    container_name: containerize_nginx_1
+    image: containerize_nginx:latest
+    build: ./nginx
+    volumes:
+      - "./nginx/external/logs:/etc/nginx/logs"
+      - "./nginx/external/security/localhost.crt:/etc/nginx/ssl/app.crt"
+      - "./nginx/external/security/localhost.key:/etc/nginx/ssl/app.key"
+    ports:
+      - "443:8443"
+      - "80:8080"
+    user: nginx
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - frontend
+    logging: *default-logging
+    environment: *nginx-environment
